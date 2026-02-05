@@ -45,6 +45,7 @@
           <div class="row g-2">
             <div class="col-md-3"><input id="nameInput" class="form-control" placeholder="Tên" required></div>
             <div class="col-md-3"><input id="priceInput" type="number" class="form-control" placeholder="Giá" required></div>
+            <div class="col-md-2"><input id="qtyInput" type="number" class="form-control" placeholder="Tồn kho" required></div>
             <div class="col-md-4"><input id="descInput" class="form-control" placeholder="Mô tả" required></div>
             <div class="col-md-2"><input id="imageInput" type="file" class="form-control" accept="image/*" required></div>
           </div>
@@ -88,7 +89,6 @@
 
         <strong>Tổng tiền: <span id="billTotal" class="price"></span></strong>
 
-        <!-- 🔥 QR SECTION (ẩn mặc định) -->
         <div id="qrSection" class="text-center mt-3" style="display:none;">
           <p>QR thanh toán</p>
           <img id="qrImg" width="200">
@@ -104,7 +104,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, update } 
+import { getDatabase, ref, push, onValue, remove, update, get } 
 from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
@@ -142,6 +142,12 @@ function startShop(){
   roleLabel.textContent = role==="admin" ? "Chế độ Người bán" : "Chế độ Khách";
   if(role==="guest") addFormSection.style.display="none";
 
+  if(role==="admin"){
+    onValue(ref(db,"orders"), snapshot=>{
+      if(snapshot.exists()) alert("🔔 Có đơn hàng mới!");
+    });
+  }
+
   onValue(ref(db,"products"), snapshot=>{
     products=[];
     snapshot.forEach(child=>{
@@ -163,6 +169,7 @@ function renderProducts(){
           <h6>${p.name}</h6>
           <p class="small text-muted">${p.desc}</p>
           <div class="price mb-2">${Number(p.price).toLocaleString()} VND</div>
+          ${role==="admin"?`<div class="text-muted small">Kho: ${p.quantity || 0}</div>`:""}
           ${role==="admin"?`
           <div class="mt-auto d-flex justify-content-between">
             <button class="btn btn-sm btn-warning edit-btn">Sửa</button>
@@ -200,7 +207,7 @@ function openBill(p){
   billQty.style.display="block";
   qtyLabel.style.display="block";
   addToCartBtn.style.display="block";
-  qrSection.style.display="none"; // ❌ Ẩn QR
+  qrSection.style.display="none";
   billQty.value=1;
   updateTotal();
   billModalInstance.show();
@@ -215,6 +222,10 @@ billQty.addEventListener("input",updateTotal);
 addToCartBtn.onclick = function(){
   const qty = parseInt(billQty.value);
   if(!qty || qty < 1) return;
+  if(qty > (currentBillProduct.quantity || 0)){
+    alert("Không đủ hàng trong kho!");
+    return;
+  }
 
   const found = cart.find(item => item.id === currentBillProduct.id);
   if(found){ found.qty += qty; }
@@ -229,15 +240,36 @@ function updateCartUI(){
   cartCount.textContent = cart.reduce((t,i)=>t+i.qty,0);
 }
 
-cartBtn.onclick = function(){
+cartBtn.onclick = async function(){
   if(cart.length===0) return;
 
   let total = 0;
   let descText = "";
 
-  cart.forEach(item=>{
+  for(const item of cart){
+    const snap = await get(ref(db,"products/"+item.id));
+    const latest = snap.val();
+    if(item.qty > latest.quantity){
+      alert(`Sản phẩm ${item.name} không đủ tồn kho!`);
+      return;
+    }
+  }
+
+  for(const item of cart){
     total += item.price * item.qty;
     descText += `${item.name} x${item.qty}\n`;
+
+    const snap = await get(ref(db,"products/"+item.id));
+    const latest = snap.val();
+    await update(ref(db,"products/"+item.id),{
+      quantity: latest.quantity - item.qty
+    });
+  }
+
+  await push(ref(db,"orders"),{
+    items: cart,
+    total: total,
+    time: new Date().toLocaleString()
   });
 
   billName.textContent = "Hóa đơn tổng";
@@ -246,12 +278,11 @@ cartBtn.onclick = function(){
   qtyLabel.style.display = "none";
   addToCartBtn.style.display = "none";
 
-  qrSection.style.display="block"; // ✅ CHỈ hiện ở đây
+  qrSection.style.display="block";
   billTotal.textContent = Number(total).toLocaleString()+" VND";
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
 
   billModalInstance.show();
-
   cart = [];
   updateCartUI();
 };
@@ -280,6 +311,7 @@ productForm.onsubmit=e=>{
     push(ref(db,"products"),{
       name:nameInput.value,
       price:priceInput.value,
+      quantity: parseInt(qtyInput.value),
       desc:descInput.value,
       image:e2.target.result
     });
