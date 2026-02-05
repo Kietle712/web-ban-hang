@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <!-- FORM THÊM (ADMIN ONLY) -->
+    <!-- FORM THÊM -->
     <div id="addFormSection" class="card mb-4">
       <div class="card-body">
         <h5>Thêm sản phẩm</h5>
@@ -57,7 +57,7 @@
   </div>
 </div>
 
-<!-- MODAL SỬA -->
+<!-- MODALS giữ nguyên -->
 <div class="modal fade" id="editModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -74,7 +74,6 @@
   </div>
 </div>
 
-<!-- MODAL HÓA ĐƠN (CHỈ KHÁCH) -->
 <div class="modal fade" id="billModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -95,40 +94,62 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+
+<!-- 🔥 FIREBASE + APP -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove, update } 
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDCVURUjjiLytzRcFe9RABka5gysGtQgWs",
+    authDomain: "web-ban-hang-21eb3.firebaseapp.com",
+    projectId: "web-ban-hang-21eb3",
+    storageBucket: "web-ban-hang-21eb3.firebasestorage.app",
+    messagingSenderId: "661863406472",
+    appId: "1:661863406472:web:eb22711a8fcff4d411f83d",
+    measurementId: "G-MHN45XD051"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 let role = null;
-let products = JSON.parse(localStorage.getItem("products")) || [];
+let products = [];
 let currentEditIndex = null;
 let currentBillProduct = null;
 
 const editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
 const billModalInstance = new bootstrap.Modal(document.getElementById('billModal'));
 
-function login(){
+window.login = function(){
   if(username.value==="admin" && password.value==="123"){
     role="admin"; startShop();
   } else alert("Sai tài khoản!");
 }
-function loginGuest(){ role="guest"; startShop(); }
-function logout(){ location.reload(); }
+window.loginGuest = function(){ role="guest"; startShop(); }
+window.logout = function(){ location.reload(); }
 
 function startShop(){
   loginSection.style.display="none";
   shopSection.style.display="block";
   roleLabel.textContent = role==="admin" ? "Chế độ Người bán" : "Chế độ Khách";
   if(role==="guest") addFormSection.style.display="none";
-  renderProducts();
-}
 
-function saveStorage(){ localStorage.setItem("products", JSON.stringify(products)); }
+  onValue(ref(db,"products"), snapshot=>{
+    products=[];
+    snapshot.forEach(child=>{
+      products.push({id:child.key, ...child.val()});
+    });
+    renderProducts();
+  });
+}
 
 function renderProducts(){
   productList.innerHTML="";
-
   products.forEach((p,i)=>{
     const col=document.createElement("div");
     col.className="col-6 col-md-4 col-lg-3 col-xl-2";
-
     col.innerHTML=`
       <div class="card h-100 product-card" style="cursor:pointer">
         <img src="${p.image}" class="card-img-top preview-img">
@@ -144,16 +165,14 @@ function renderProducts(){
         </div>
       </div>`;
 
-    // 👤 KHÁCH MỚI ĐƯỢC MỞ HÓA ĐƠN
     if(role==="guest"){
       col.querySelector(".product-card").addEventListener("click", ()=> openBill(p));
     }
 
-    // 🧑‍💼 ADMIN CHỈ QUẢN LÝ
     if(role==="admin"){
       col.querySelector(".delete-btn").onclick=(e)=>{
         e.stopPropagation();
-        products.splice(i,1); saveStorage(); renderProducts();
+        remove(ref(db,"products/"+p.id));
       };
       col.querySelector(".edit-btn").onclick=(e)=>{
         e.stopPropagation();
@@ -185,12 +204,19 @@ function updateTotal(){
 billQty.addEventListener("input",updateTotal);
 
 saveEdit.onclick=()=>{
-  if(editPrice.value) products[currentEditIndex].price=editPrice.value;
+  let updates={};
+  if(editPrice.value) updates.price=editPrice.value;
+
   if(editImage.files[0]){
     const r=new FileReader();
-    r.onload=e=>{products[currentEditIndex].image=e.target.result; saveStorage(); renderProducts();}
+    r.onload=e=>{
+      updates.image=e.target.result;
+      update(ref(db,"products/"+products[currentEditIndex].id), updates);
+    };
     r.readAsDataURL(editImage.files[0]);
-  } else { saveStorage(); renderProducts(); }
+  } else {
+    update(ref(db,"products/"+products[currentEditIndex].id), updates);
+  }
   editModalInstance.hide();
 };
 
@@ -198,8 +224,13 @@ productForm.onsubmit=e=>{
   e.preventDefault();
   const r=new FileReader();
   r.onload=e2=>{
-    products.push({name:nameInput.value,price:priceInput.value,desc:descInput.value,image:e2.target.result});
-    saveStorage(); renderProducts(); productForm.reset();
+    push(ref(db,"products"),{
+      name:nameInput.value,
+      price:priceInput.value,
+      desc:descInput.value,
+      image:e2.target.result
+    });
+    productForm.reset();
   };
   r.readAsDataURL(imageInput.files[0]);
 };
