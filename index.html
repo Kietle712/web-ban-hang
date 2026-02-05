@@ -195,6 +195,7 @@ function openBill(p){
   billQty.style.display="block";
   qtyLabel.style.display="block";
   addToCartBtn.style.display="block";
+  qrImg.style.display="none";   // ❌ Ẩn QR khi chọn sản phẩm
   billQty.value=1;
   updateTotal();
   billModalInstance.show();
@@ -203,7 +204,6 @@ function openBill(p){
 function updateTotal(){
   let total=currentBillProduct.price*billQty.value;
   billTotal.textContent=Number(total).toLocaleString()+" VND";
-  qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
 }
 billQty.addEventListener("input",updateTotal);
 
@@ -220,7 +220,7 @@ addToCartBtn.onclick = function(){
 };
 
 function updateCartUI(){
-  cartBtn.style.display = "inline-block";
+  cartBtn.style.display = cart.length ? "inline-block" : "none";
   cartCount.textContent = cart.reduce((t,i)=>t+i.qty,0);
 }
 
@@ -240,6 +240,8 @@ cartBtn.onclick = function(){
   billQty.style.display = "none";
   qtyLabel.style.display = "none";
   addToCartBtn.style.display = "none";
+  qrImg.style.display="block"; // ✅ Chỉ hiện QR khi thanh toán
+
   billTotal.textContent = Number(total).toLocaleString()+" VND";
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
 
