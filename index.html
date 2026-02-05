@@ -28,7 +28,10 @@
 
   <div id="shopSection" style="display:none;">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2>🛒 Shop Mini</h2>
+      <div class="d-flex align-items-center">
+        <h2 class="me-3">🛒 Shop Mini</h2>
+        <button class="btn btn-success btn-sm" onclick="openCart()">Xem giỏ hàng</button>
+      </div>
       <div>
         <span id="roleLabel" class="me-3 fw-bold text-primary"></span>
         <button class="btn btn-outline-danger btn-sm" onclick="logout()">Đăng xuất</button>
@@ -54,6 +57,7 @@
   </div>
 </div>
 
+<!-- Modal sửa -->
 <div class="modal fade" id="editModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -70,6 +74,7 @@
   </div>
 </div>
 
+<!-- Modal hóa đơn -->
 <div class="modal fade" id="billModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -77,13 +82,25 @@
       <div class="modal-body">
         <h6 id="billName"></h6>
         <p id="billDesc" class="text-muted"></p>
-        <label>Số lượng</label>
-        <input type="number" id="billQty" value="1" min="1" class="form-control mb-3">
         <strong>Tổng tiền: <span id="billTotal" class="price"></span></strong>
         <div class="text-center mt-3">
           <p>QR thanh toán</p>
           <img id="qrImg" width="200">
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal giỏ hàng -->
+<div class="modal fade" id="cartModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>🛒 Giỏ hàng</h5></div>
+      <div class="modal-body" id="cartBody"></div>
+      <div class="modal-footer">
+        <strong class="me-auto">Tổng: <span id="cartTotal" class="price"></span></strong>
+        <button class="btn btn-primary" onclick="checkoutCart()">Thanh toán</button>
       </div>
     </div>
   </div>
@@ -96,46 +113,31 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, push, onValue, remove, update } 
 from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDCVURUjjiLytzRcFe9RABka5gysGtQgWs",
-    authDomain: "web-ban-hang-21eb3.firebaseapp.com",
-    projectId: "web-ban-hang-21eb3",
-    storageBucket: "web-ban-hang-21eb3.firebasestorage.app",
-    messagingSenderId: "661863406472",
-    appId: "1:661863406472:web:eb22711a8fcff4d411f83d",
-    measurementId: "G-MHN45XD051"
-};
+const firebaseConfig = { /* giữ nguyên config của bạn */ };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-let role = null;
-let products = [];
-let currentEditIndex = null;
-let currentBillProduct = null;
+let role=null, products=[], cart=[];
+let currentEditIndex=null;
 
-const editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
-const billModalInstance = new bootstrap.Modal(document.getElementById('billModal'));
+const editModalInstance=new bootstrap.Modal(editModal);
+const billModalInstance=new bootstrap.Modal(billModal);
+const cartModalInstance=new bootstrap.Modal(cartModal);
 
-window.login = function(){
-  if(username.value==="admin" && password.value==="123"){
-    role="admin"; startShop();
-  } else alert("Sai tài khoản!");
-}
-window.loginGuest = function(){ role="guest"; startShop(); }
-window.logout = function(){ location.reload(); }
+window.login=()=>{ if(username.value==="admin"&&password.value==="123"){role="admin";startShop();}else alert("Sai tài khoản!"); }
+window.loginGuest=()=>{role="guest";startShop();}
+window.logout=()=>location.reload();
 
 function startShop(){
   loginSection.style.display="none";
   shopSection.style.display="block";
-  roleLabel.textContent = role==="admin" ? "Chế độ Người bán" : "Chế độ Khách";
+  roleLabel.textContent=role==="admin"?"Chế độ Người bán":"Chế độ Khách";
   if(role==="guest") addFormSection.style.display="none";
 
-  onValue(ref(db,"products"), snapshot=>{
+  onValue(ref(db,"products"),snap=>{
     products=[];
-    snapshot.forEach(child=>{
-      products.push({id:child.key, ...child.val()});
-    });
+    snap.forEach(c=>products.push({id:c.key,...c.val()}));
     renderProducts();
   });
 }
@@ -146,72 +148,60 @@ function renderProducts(){
     const col=document.createElement("div");
     col.className="col-6 col-md-4 col-lg-3 col-xl-2";
     col.innerHTML=`
-      <div class="card h-100 product-card" style="cursor:pointer">
-        <img src="${p.image}" class="card-img-top preview-img">
-        <div class="card-body d-flex flex-column">
-          <h6>${p.name}</h6>
-          <p class="small text-muted">${p.desc}</p>
-          <div class="price mb-2">${Number(p.price).toLocaleString()} VND</div>
-          ${role==="admin"?`
-          <div class="mt-auto d-flex justify-content-between">
-            <button class="btn btn-sm btn-warning edit-btn">Sửa</button>
-            <button class="btn btn-sm btn-danger delete-btn">Xóa</button>
-          </div>`:""}
-        </div>
-      </div>`;
+    <div class="card h-100 product-card" style="cursor:pointer">
+      <img src="${p.image}" class="card-img-top preview-img">
+      <div class="card-body d-flex flex-column">
+        <h6>${p.name}</h6>
+        <p class="small text-muted">${p.desc}</p>
+        <div class="price mb-2">${Number(p.price).toLocaleString()} VND</div>
+        ${role==="admin"?`<div class="mt-auto d-flex justify-content-between">
+        <button class="btn btn-sm btn-warning edit-btn">Sửa</button>
+        <button class="btn btn-sm btn-danger delete-btn">Xóa</button></div>`:""}
+      </div>
+    </div>`;
 
-    if(role==="guest"){
-      col.querySelector(".product-card").addEventListener("click", ()=> openBill(p));
-    }
-
+    if(role==="guest") col.querySelector(".product-card").onclick=()=>addToCart(p);
     if(role==="admin"){
-      col.querySelector(".delete-btn").onclick=(e)=>{
-        e.stopPropagation();
-        remove(ref(db,"products/"+p.id));
-      };
-      col.querySelector(".edit-btn").onclick=(e)=>{
-        e.stopPropagation();
-        currentEditIndex=i;
-        editPrice.value=p.price;
-        editImage.value="";
-        editModalInstance.show();
-      };
+      col.querySelector(".delete-btn").onclick=e=>{e.stopPropagation();remove(ref(db,"products/"+p.id));};
+      col.querySelector(".edit-btn").onclick=e=>{e.stopPropagation();currentEditIndex=i;editPrice.value=p.price;editModalInstance.show();};
     }
-
     productList.appendChild(col);
   });
 }
 
-function openBill(p){
-  currentBillProduct=p;
-  billName.textContent=p.name;
-  billDesc.textContent=p.desc;
-  billQty.value=1;
-  updateTotal();
+function addToCart(p){
+  let f=cart.find(i=>i.id===p.id);
+  f?f.qty++:cart.push({...p,qty:1});
+  alert("Đã thêm vào giỏ 🛒");
+}
+
+function openCart(){
+  cartBody.innerHTML="";
+  let total=0;
+  cart.forEach(i=>{
+    total+=i.price*i.qty;
+    cartBody.innerHTML+=`<div class="d-flex justify-content-between border-bottom py-2">
+    <div><strong>${i.name}</strong><br>SL: ${i.qty}</div>
+    <div class="price">${Number(i.price*i.qty).toLocaleString()} VND</div></div>`;
+  });
+  cartTotal.textContent=Number(total).toLocaleString()+" VND";
+  cartModalInstance.show();
+}
+
+function checkoutCart(){
+  if(cart.length===0) return alert("Giỏ hàng trống!");
+  let total=cart.reduce((s,i)=>s+i.price*i.qty,0);
+  billName.textContent="Thanh toán giỏ hàng";
+  billDesc.textContent="Tổng nhiều sản phẩm";
+  billTotal.textContent=Number(total).toLocaleString()+" VND";
+  qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
+  cartModalInstance.hide();
   billModalInstance.show();
 }
 
-function updateTotal(){
-  let total=currentBillProduct.price*billQty.value;
-  billTotal.textContent=Number(total).toLocaleString()+" VND";
-  qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
-}
-billQty.addEventListener("input",updateTotal);
-
 saveEdit.onclick=()=>{
-  let updates={};
-  if(editPrice.value) updates.price=editPrice.value;
-
-  if(editImage.files[0]){
-    const r=new FileReader();
-    r.onload=e=>{
-      updates.image=e.target.result;
-      update(ref(db,"products/"+products[currentEditIndex].id), updates);
-    };
-    r.readAsDataURL(editImage.files[0]);
-  } else {
-    update(ref(db,"products/"+products[currentEditIndex].id), updates);
-  }
+  let up={price:editPrice.value};
+  update(ref(db,"products/"+products[currentEditIndex].id),up);
   editModalInstance.hide();
 };
 
@@ -232,4 +222,3 @@ productForm.onsubmit=e=>{
 </script>
 </body>
 </html>
-
