@@ -192,7 +192,9 @@ function renderProducts(){
       col.querySelector(".edit-btn").onclick=(e)=>{
         e.stopPropagation();
         currentEditIndex=i;
-        editPrice.value=p.price;
+        editName.value = p.name;
+        editPrice.value = p.price;
+        editQty.value = p.quantity || 0;
         editImage.value="";
         editModalInstance.show();
       };
@@ -289,22 +291,27 @@ cartBtn.onclick = async function(){
   updateCartUI();
 };
 
-saveEdit.onclick=()=>{
-  let updates={};
-  if(editPrice.value) updates.price=editPrice.value;
+saveEdit.onclick = () => {
+  let updates = {};
+
+  if(editName.value) updates.name = editName.value;
+  if(editPrice.value) updates.price = parseInt(editPrice.value);
+  if(editQty.value) updates.quantity = parseInt(editQty.value);
 
   if(editImage.files[0]){
-    const r=new FileReader();
-    r.onload=e=>{
-      updates.image=e.target.result;
+    const r = new FileReader();
+    r.onload = e => {
+      updates.image = e.target.result;
       update(ref(db,"products/"+products[currentEditIndex].id), updates);
     };
     r.readAsDataURL(editImage.files[0]);
   } else {
     update(ref(db,"products/"+products[currentEditIndex].id), updates);
   }
+
   editModalInstance.hide();
 };
+
 
 productForm.onsubmit=e=>{
   e.preventDefault();
@@ -324,4 +331,5 @@ productForm.onsubmit=e=>{
 </script>
 </body>
 </html>
+
 
