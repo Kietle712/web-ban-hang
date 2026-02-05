@@ -82,13 +82,18 @@
       <div class="modal-body">
         <h6 id="billName"></h6>
         <p id="billDesc" class="text-muted"></p>
+
         <label id="qtyLabel">Số lượng</label>
         <input type="number" id="billQty" value="1" min="1" class="form-control mb-3">
+
         <strong>Tổng tiền: <span id="billTotal" class="price"></span></strong>
-        <div class="text-center mt-3">
+
+        <!-- 🔥 QR SECTION (ẩn mặc định) -->
+        <div id="qrSection" class="text-center mt-3" style="display:none;">
           <p>QR thanh toán</p>
           <img id="qrImg" width="200">
         </div>
+
         <button id="addToCartBtn" class="btn btn-primary w-100 mt-3">Thêm vào giỏ</button>
       </div>
     </div>
@@ -195,7 +200,7 @@ function openBill(p){
   billQty.style.display="block";
   qtyLabel.style.display="block";
   addToCartBtn.style.display="block";
-  qrImg.style.display="none";   // ❌ Ẩn QR khi chọn sản phẩm
+  qrSection.style.display="none"; // ❌ Ẩn QR
   billQty.value=1;
   updateTotal();
   billModalInstance.show();
@@ -240,8 +245,8 @@ cartBtn.onclick = function(){
   billQty.style.display = "none";
   qtyLabel.style.display = "none";
   addToCartBtn.style.display = "none";
-  qrImg.style.display="block"; // ✅ Chỉ hiện QR khi thanh toán
 
+  qrSection.style.display="block"; // ✅ CHỈ hiện ở đây
   billTotal.textContent = Number(total).toLocaleString()+" VND";
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
 
