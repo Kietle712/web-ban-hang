@@ -89,6 +89,7 @@
           <p>QR thanh toán</p>
           <img id="qrImg" width="200">
         </div>
+        <button id="addToCartBtn" class="btn btn-primary w-100 mt-3">Thêm vào giỏ</button>
       </div>
     </div>
   </div>
@@ -166,7 +167,7 @@ function renderProducts(){
       </div>`;
 
     if(role==="guest"){
-      col.querySelector(".product-card").addEventListener("click", ()=> addToCart(p));
+      col.querySelector(".product-card").addEventListener("click", ()=> openBill(p));
     }
 
     if(role==="admin"){
@@ -187,12 +188,36 @@ function renderProducts(){
   });
 }
 
-function addToCart(product){
-  const found = cart.find(item => item.id === product.id);
-  if(found){ found.qty++; }
-  else{ cart.push({...product, qty:1}); }
-  updateCartUI();
+function openBill(p){
+  currentBillProduct=p;
+  billName.textContent=p.name;
+  billDesc.textContent=p.desc;
+  billQty.style.display="block";
+  qtyLabel.style.display="block";
+  addToCartBtn.style.display="block";
+  billQty.value=1;
+  updateTotal();
+  billModalInstance.show();
 }
+
+function updateTotal(){
+  let total=currentBillProduct.price*billQty.value;
+  billTotal.textContent=Number(total).toLocaleString()+" VND";
+  qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
+}
+billQty.addEventListener("input",updateTotal);
+
+addToCartBtn.onclick = function(){
+  const qty = parseInt(billQty.value);
+  if(!qty || qty < 1) return;
+
+  const found = cart.find(item => item.id === currentBillProduct.id);
+  if(found){ found.qty += qty; }
+  else{ cart.push({...currentBillProduct, qty: qty}); }
+
+  updateCartUI();
+  billModalInstance.hide();
+};
 
 function updateCartUI(){
   cartBtn.style.display = "inline-block";
@@ -214,6 +239,7 @@ cartBtn.onclick = function(){
   billDesc.textContent = descText;
   billQty.style.display = "none";
   qtyLabel.style.display = "none";
+  addToCartBtn.style.display = "none";
   billTotal.textContent = Number(total).toLocaleString()+" VND";
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
 
@@ -221,25 +247,7 @@ cartBtn.onclick = function(){
 
   cart = [];
   updateCartUI();
-}
-
-function openBill(p){
-  currentBillProduct=p;
-  billName.textContent=p.name;
-  billDesc.textContent=p.desc;
-  billQty.style.display="block";
-  qtyLabel.style.display="block";
-  billQty.value=1;
-  updateTotal();
-  billModalInstance.show();
-}
-
-function updateTotal(){
-  let total=currentBillProduct.price*billQty.value;
-  billTotal.textContent=Number(total).toLocaleString()+" VND";
-  qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
-}
-billQty.addEventListener("input",updateTotal);
+};
 
 saveEdit.onclick=()=>{
   let updates={};
