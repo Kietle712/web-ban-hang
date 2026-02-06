@@ -34,6 +34,10 @@
           🧾 Giỏ hàng (<span id="cartCount">0</span>)
         </button>
 
+        <button id="myOrdersBtn" class="btn btn-info btn-sm me-2" style="display:none">
+          📜 Đơn của tôi
+        </button>
+
         <span id="roleLabel" class="me-3 fw-bold text-primary"></span>
 
         <button id="orderToggleBtn" class="btn btn-warning btn-sm me-2" style="display:none">
@@ -71,7 +75,6 @@
   </div>
 </div>
 
-<!-- Modal sửa -->
 <div class="modal fade" id="editModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -90,7 +93,6 @@
   </div>
 </div>
 
-<!-- Modal hóa đơn -->
 <div class="modal fade" id="billModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -106,6 +108,7 @@
 
         <div id="customerInfo" style="display:none;" class="mt-3">
           <input id="customerName" class="form-control mb-2" placeholder="Tên người nhận">
+          <input id="customerPhone" class="form-control mb-2" placeholder="Số điện thoại">
           <input id="customerAddress" class="form-control" placeholder="Địa chỉ nhận hàng">
         </div>
 
@@ -117,6 +120,18 @@
         <button id="addToCartBtn" class="btn btn-primary w-100 mt-3">Thêm vào giỏ</button>
         <button id="confirmOrderBtn" class="btn btn-success w-100 mt-2" style="display:none">✅ Xác nhận đặt hàng</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="myOrdersModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5>📜 Tra cứu đơn hàng</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="myOrdersList"></div>
     </div>
   </div>
 </div>
@@ -148,6 +163,7 @@ let cart = [];
 
 const editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
 const billModalInstance = new bootstrap.Modal(document.getElementById('billModal'));
+const myOrdersModal = new bootstrap.Modal(document.getElementById('myOrdersModal'));
 
 window.login = function(){
   if(username.value==="admin" && password.value==="123"){
@@ -161,7 +177,11 @@ function startShop(){
   loginSection.style.display="none";
   shopSection.style.display="block";
   roleLabel.textContent = role==="admin" ? "Chế độ Người bán" : "Chế độ Khách";
-  if(role==="guest") addFormSection.style.display="none";
+  if(role==="guest"){
+    addFormSection.style.display="none";
+    myOrdersBtn.style.display="inline-block";
+    myOrdersBtn.onclick = showMyOrders;
+  }
 
   if(role==="admin"){
     orderToggleBtn.style.display="inline-block";
@@ -236,6 +256,7 @@ function renderOrders(snapshot){
     div.innerHTML = `
       <strong>🧾 Đơn lúc:</strong> ${order.time} <br>
       <strong>👤 Khách:</strong> ${order.customerName || "Không có"} <br>
+      <strong>📞 SĐT:</strong> ${order.customerPhone || "Không có"} <br>
       <strong>🏠 Địa chỉ:</strong> ${order.customerAddress || "Không có"} <br>
       <pre class="mb-1">${order.items.map(i=>`${i.name} x${i.qty}`).join("\n")}</pre>
       <strong>Tổng tiền:</strong> ${Number(order.total).toLocaleString()} VND<br>
@@ -260,7 +281,6 @@ function renderOrders(snapshot){
   });
 }
 
-/* PHẦN GIỎ HÀNG & ĐẶT HÀNG GIỮ NGUYÊN */
 function openBill(p){
   currentBillProduct=p;
   billName.textContent=p.name;
@@ -315,8 +335,9 @@ cartBtn.onclick = function(){
 
 confirmOrderBtn.onclick = async function(){
   const name = customerName.value.trim();
+  const phone = customerPhone.value.trim();
   const address = customerAddress.value.trim();
-  if(!name || !address) return alert("Vui lòng nhập tên và địa chỉ!");
+  if(!name || !phone || !address) return alert("Vui lòng nhập đầy đủ thông tin!");
 
   let total = 0;
   for(const item of cart){
@@ -337,6 +358,7 @@ confirmOrderBtn.onclick = async function(){
     time: new Date().toLocaleString(),
     seen: false,
     customerName: name,
+    customerPhone: phone,
     customerAddress: address
   });
 
@@ -350,6 +372,52 @@ confirmOrderBtn.onclick = async function(){
 
   cart=[];
   updateCartUI();
+};
+
+function showMyOrders(){
+  myOrdersList.innerHTML = `
+    <input id="searchPhone" class="form-control mb-2" placeholder="Nhập SĐT đã đặt hàng">
+    <button class="btn btn-primary w-100" onclick="searchMyOrders()">🔍 Tìm đơn</button>
+    <div id="orderSearchResult" class="mt-3 small"></div>
+  `;
+  myOrdersModal.show();
+}
+
+window.searchMyOrders = function(){
+  const phone = document.getElementById("searchPhone").value.trim();
+  const box = document.getElementById("orderSearchResult");
+
+  if(!phone){
+    box.innerHTML = "<p class='text-danger'>Vui lòng nhập SĐT!</p>";
+    return;
+  }
+
+  box.innerHTML = "Đang tìm đơn hàng...";
+
+  get(ref(db,"orders")).then(snapshot=>{
+    box.innerHTML="";
+    let found=false;
+
+    snapshot.forEach(child=>{
+      const o=child.val();
+      if(o.customerPhone && o.customerPhone===phone){
+        found=true;
+        box.innerHTML+=`
+          <div class="border rounded p-2 mb-2">
+            <strong>🕒 ${o.time}</strong><br>
+            ${o.items.map(i=>`${i.name} x${i.qty}`).join("<br>")}
+            <br><strong>Tổng tiền:</strong> ${Number(o.total).toLocaleString()} VND
+            <br>
+            <span class="badge ${o.seen?"bg-success":"bg-warning"}">
+              ${o.seen?"Đã xử lý":"Chờ xử lý"}
+            </span>
+          </div>
+        `;
+      }
+    });
+
+    if(!found) box.innerHTML="<p class='text-muted'>Không tìm thấy đơn hàng nào.</p>";
+  });
 };
 
 saveEdit.onclick = () => {
