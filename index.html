@@ -33,7 +33,14 @@
         <button id="cartBtn" class="btn btn-success btn-sm me-2" style="display:none">
           🧾 Giỏ hàng (<span id="cartCount">0</span>)
         </button>
+
         <span id="roleLabel" class="me-3 fw-bold text-primary"></span>
+
+        <!-- NÚT ĐƠN HÀNG CHO ADMIN -->
+        <button id="orderToggleBtn" class="btn btn-warning btn-sm me-2" style="display:none">
+          📦 Đơn hàng
+        </button>
+
         <button class="btn btn-outline-danger btn-sm" onclick="logout()">Đăng xuất</button>
       </div>
     </div>
@@ -54,7 +61,7 @@
       </div>
     </div>
 
-    <!-- 🆕 KHU QUẢN LÝ ĐƠN HÀNG CHO ADMIN -->
+    <!-- KHU ĐƠN HÀNG -->
     <div id="orderSection" class="card mb-4" style="display:none;">
       <div class="card-body">
         <h5>📦 Đơn hàng khách đã đặt</h5>
@@ -72,7 +79,7 @@
     <div class="modal-content">
       <div class="modal-header"><h5>Chỉnh sửa sản phẩm</h5></div>
       <div class="modal-body">
-         <input id="editName" class="form-control mb-2" placeholder="Tên sản phẩm">
+        <input id="editName" class="form-control mb-2" placeholder="Tên sản phẩm">
         <input type="number" id="editPrice" class="form-control mb-2" placeholder="Giá mới">
         <input type="number" id="editQty" class="form-control mb-2" placeholder="Tồn kho">
         <input type="file" id="editImage" class="form-control" accept="image/*">
@@ -99,12 +106,19 @@
 
         <strong>Tổng tiền: <span id="billTotal" class="price"></span></strong>
 
+        <!-- THÔNG TIN KHÁCH -->
+        <div id="customerInfo" style="display:none;" class="mt-3">
+          <input id="customerName" class="form-control mb-2" placeholder="Tên người nhận">
+          <input id="customerAddress" class="form-control" placeholder="Địa chỉ nhận hàng">
+        </div>
+
         <div id="qrSection" class="text-center mt-3" style="display:none;">
           <p>QR thanh toán</p>
           <img id="qrImg" width="200">
         </div>
 
         <button id="addToCartBtn" class="btn btn-primary w-100 mt-3">Thêm vào giỏ</button>
+        <button id="confirmOrderBtn" class="btn btn-success w-100 mt-2" style="display:none">✅ Xác nhận đặt hàng</button>
       </div>
     </div>
   </div>
@@ -153,10 +167,11 @@ function startShop(){
   if(role==="guest") addFormSection.style.display="none";
 
   if(role==="admin"){
-    orderSection.style.display="block";
-    onValue(ref(db,"orders"), snapshot=>{
-      renderOrders(snapshot);
-    });
+    orderToggleBtn.style.display="inline-block";
+    orderToggleBtn.onclick=()=>orderSection.style.display=
+      orderSection.style.display==="none"?"block":"none";
+
+    onValue(ref(db,"orders"), snapshot=> renderOrders(snapshot));
   }
 
   onValue(ref(db,"products"), snapshot=>{
@@ -213,21 +228,18 @@ function renderProducts(){
   });
 }
 
-/* ===== HIỂN THỊ ĐƠN HÀNG CHO ADMIN ===== */
 function renderOrders(snapshot){
   orderList.innerHTML="";
-  let hasNewOrder = false;
-
   snapshot.forEach(child=>{
     const order = child.val();
     const orderId = child.key;
-
-    if(!order.seen) hasNewOrder = true;
 
     const div = document.createElement("div");
     div.className = "border p-2 mb-2 rounded small";
     div.innerHTML = `
       <strong>🧾 Đơn lúc:</strong> ${order.time} <br>
+      <strong>👤 Khách:</strong> ${order.customerName || "Không có"} <br>
+      <strong>🏠 Địa chỉ:</strong> ${order.customerAddress || "Không có"} <br>
       <pre class="mb-1">${order.items.map(i=>`${i.name} x${i.qty}`).join("\n")}</pre>
       <strong>Tổng tiền:</strong> ${Number(order.total).toLocaleString()} VND<br>
       <label>
@@ -235,19 +247,12 @@ function renderOrders(snapshot){
         Đã xử lý
       </label>
     `;
-
     div.querySelector("input").onchange = (e) => {
       update(ref(db,"orders/"+orderId), { seen: e.target.checked });
     };
-
     orderList.appendChild(div);
   });
-
-  if(hasNewOrder){
-    alert("🔔 Có đơn hàng mới chưa xử lý!");
-  }
 }
-/* ======================================= */
 
 function openBill(p){
   currentBillProduct=p;
@@ -256,6 +261,8 @@ function openBill(p){
   billQty.style.display="block";
   qtyLabel.style.display="block";
   addToCartBtn.style.display="block";
+  confirmOrderBtn.style.display="none";
+  customerInfo.style.display="none";
   qrSection.style.display="none";
   billQty.value=1;
   updateTotal();
@@ -275,11 +282,9 @@ addToCartBtn.onclick = function(){
     alert("Không đủ hàng trong kho!");
     return;
   }
-
   const found = cart.find(item => item.id === currentBillProduct.id);
   if(found){ found.qty += qty; }
   else{ cart.push({...currentBillProduct, qty: qty}); }
-
   updateCartUI();
   billModalInstance.hide();
 };
@@ -289,61 +294,62 @@ function updateCartUI(){
   cartCount.textContent = cart.reduce((t,i)=>t+i.qty,0);
 }
 
-cartBtn.onclick = async function(){
-  if(cart.length===0) return;
+cartBtn.onclick = function(){
+  billName.textContent = "Xác nhận đơn hàng";
+  billDesc.textContent = cart.map(i=>`${i.name} x${i.qty}`).join("\n");
+  billQty.style.display="none";
+  qtyLabel.style.display="none";
+  addToCartBtn.style.display="none";
+  customerInfo.style.display="block";
+  confirmOrderBtn.style.display="block";
+  qrSection.style.display="none";
+  billModalInstance.show();
+};
+
+confirmOrderBtn.onclick = async function(){
+  const name = customerName.value.trim();
+  const address = customerAddress.value.trim();
+  if(!name || !address) return alert("Vui lòng nhập tên và địa chỉ!");
 
   let total = 0;
-  let descText = "";
-
   for(const item of cart){
     const snap = await get(ref(db,"products/"+item.id));
     const latest = snap.val();
-    if(item.qty > latest.quantity){
-      alert(`Sản phẩm ${item.name} không đủ tồn kho!`);
-      return;
-    }
+    if(item.qty > latest.quantity) return alert(`Sản phẩm ${item.name} không đủ tồn kho!`);
   }
-
   for(const item of cart){
     total += item.price * item.qty;
-    descText += `${item.name} x${item.qty}\n`;
-
     const snap = await get(ref(db,"products/"+item.id));
     const latest = snap.val();
-    await update(ref(db,"products/"+item.id),{
-      quantity: latest.quantity - item.qty
-    });
+    await update(ref(db,"products/"+item.id),{ quantity: latest.quantity - item.qty });
   }
 
   await push(ref(db,"orders"),{
     items: cart,
     total: total,
     time: new Date().toLocaleString(),
-    seen: false
+    seen: false,
+    customerName: name,
+    customerAddress: address
   });
 
-  billName.textContent = "Hóa đơn tổng";
-  billDesc.textContent = descText;
-  billQty.style.display = "none";
-  qtyLabel.style.display = "none";
-  addToCartBtn.style.display = "none";
-
+  billName.textContent="Hóa đơn";
+  billDesc.textContent=cart.map(i=>`${i.name} x${i.qty}`).join("\n");
+  billTotal.textContent=Number(total).toLocaleString()+" VND";
+  customerInfo.style.display="none";
+  confirmOrderBtn.style.display="none";
   qrSection.style.display="block";
-  billTotal.textContent = Number(total).toLocaleString()+" VND";
-  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
+  qrImg.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ThanhToan_${total}_VND`;
 
-  billModalInstance.show();
-  cart = [];
+  cart=[];
   updateCartUI();
 };
 
 saveEdit.onclick = () => {
   let updates = {};
-
   if(editName.value) updates.name = editName.value;
   if(editPrice.value) updates.price = parseInt(editPrice.value);
   if(editQty.value) updates.quantity = parseInt(editQty.value);
-
   if(editImage.files[0]){
     const r = new FileReader();
     r.onload = e => {
@@ -354,7 +360,6 @@ saveEdit.onclick = () => {
   } else {
     update(ref(db,"products/"+products[currentEditIndex].id), updates);
   }
-
   editModalInstance.hide();
 };
 
