@@ -227,8 +227,6 @@ function renderProducts(){
 
 function renderOrders(snapshot){
   orderList.innerHTML="";
-  let hasNewOrder = false; 
-  if(!order.seen) hasNewOrder = true; 
   snapshot.forEach(child=>{
     const order = child.val();
     const orderId = child.key;
@@ -252,30 +250,14 @@ function renderOrders(snapshot){
       update(ref(db,"orders/"+orderId), { seen: e.target.checked });
     };
 
-    div.querySelector(".delete-order-btn").onclick = async () => {
-      if(!confirm("Bạn có chắc muốn xóa đơn hàng này không?")) return;
-
-      if(!order.seen){
-        for(const item of order.items){
-          const productRef = ref(db, "products/" + item.id);
-          const snap = await get(productRef);
-          const product = snap.val();
-    
-          if(product){
-            await update(productRef, {
-              quantity: (product.quantity || 0) + item.qty
-            });
-          }
-        }
+    div.querySelector(".delete-order-btn").onclick = () => {
+      if(confirm("Bạn có chắc muốn xóa đơn hàng này không?")){
+        remove(ref(db,"orders/"+orderId));
       }
-
-      await remove(ref(db,"orders/"+orderId));
     };
+
     orderList.appendChild(div);
   });
-  if(hasNewOrder){
-    setTimeout(()=>alert("🔔 Có đơn hàng mới chưa xử lý!"), 300);
-  }
 }
 
 /* PHẦN GIỎ HÀNG & ĐẶT HÀNG GIỮ NGUYÊN */
@@ -406,4 +388,3 @@ productForm.onsubmit=e=>{
 </script>
 </body>
 </html>
-
