@@ -54,6 +54,14 @@
       </div>
     </div>
 
+    <!-- 🆕 KHU QUẢN LÝ ĐƠN HÀNG CHO ADMIN -->
+    <div id="orderSection" class="card mb-4" style="display:none;">
+      <div class="card-body">
+        <h5>📦 Đơn hàng khách đã đặt</h5>
+        <div id="orderList"></div>
+      </div>
+    </div>
+
     <div class="row g-3" id="productList"></div>
   </div>
 </div>
@@ -145,8 +153,9 @@ function startShop(){
   if(role==="guest") addFormSection.style.display="none";
 
   if(role==="admin"){
+    orderSection.style.display="block";
     onValue(ref(db,"orders"), snapshot=>{
-      if(snapshot.exists()) alert("🔔 Có đơn hàng mới!");
+      renderOrders(snapshot);
     });
   }
 
@@ -203,6 +212,42 @@ function renderProducts(){
     productList.appendChild(col);
   });
 }
+
+/* ===== HIỂN THỊ ĐƠN HÀNG CHO ADMIN ===== */
+function renderOrders(snapshot){
+  orderList.innerHTML="";
+  let hasNewOrder = false;
+
+  snapshot.forEach(child=>{
+    const order = child.val();
+    const orderId = child.key;
+
+    if(!order.seen) hasNewOrder = true;
+
+    const div = document.createElement("div");
+    div.className = "border p-2 mb-2 rounded small";
+    div.innerHTML = `
+      <strong>🧾 Đơn lúc:</strong> ${order.time} <br>
+      <pre class="mb-1">${order.items.map(i=>`${i.name} x${i.qty}`).join("\n")}</pre>
+      <strong>Tổng tiền:</strong> ${Number(order.total).toLocaleString()} VND<br>
+      <label>
+        <input type="checkbox" ${order.seen ? "checked" : ""}>
+        Đã xử lý
+      </label>
+    `;
+
+    div.querySelector("input").onchange = (e) => {
+      update(ref(db,"orders/"+orderId), { seen: e.target.checked });
+    };
+
+    orderList.appendChild(div);
+  });
+
+  if(hasNewOrder){
+    alert("🔔 Có đơn hàng mới chưa xử lý!");
+  }
+}
+/* ======================================= */
 
 function openBill(p){
   currentBillProduct=p;
@@ -273,7 +318,8 @@ cartBtn.onclick = async function(){
   await push(ref(db,"orders"),{
     items: cart,
     total: total,
-    time: new Date().toLocaleString()
+    time: new Date().toLocaleString(),
+    seen: false
   });
 
   billName.textContent = "Hóa đơn tổng";
@@ -312,7 +358,6 @@ saveEdit.onclick = () => {
   editModalInstance.hide();
 };
 
-
 productForm.onsubmit=e=>{
   e.preventDefault();
   const r=new FileReader();
@@ -331,5 +376,3 @@ productForm.onsubmit=e=>{
 </script>
 </body>
 </html>
-
-
