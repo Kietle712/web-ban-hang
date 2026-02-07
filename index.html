@@ -400,6 +400,8 @@ window.searchMyOrders = function(){
 
     snapshot.forEach(child=>{
       const o=child.val();
+      const orderId = child.key;
+
       if(o.customerPhone && o.customerPhone===phone){
         found=true;
         box.innerHTML+=`
@@ -411,6 +413,7 @@ window.searchMyOrders = function(){
             <span class="badge ${o.seen?"bg-success":"bg-warning"}">
               ${o.seen?"Đã xử lý":"Chờ xử lý"}
             </span>
+            ${!o.seen ? `<button class="btn btn-sm btn-danger mt-2" onclick="cancelOrder('${orderId}')">❌ Hủy đơn</button>` : ``}
           </div>
         `;
       }
@@ -418,6 +421,36 @@ window.searchMyOrders = function(){
 
     if(!found) box.innerHTML="<p class='text-muted'>Không tìm thấy đơn hàng nào.</p>";
   });
+};
+
+async function restoreStock(items){
+  for(const item of items){
+    const snap = await get(ref(db,"products/"+item.id));
+    if(!snap.exists()) continue;
+    const p = snap.val();
+    await update(ref(db,"products/"+item.id),{
+      quantity: (p.quantity || 0) + item.qty
+    });
+  }
+}
+
+window.cancelOrder = async function(orderId){
+  if(!confirm("Bạn có chắc muốn hủy đơn này không?")) return;
+
+  const snap = await get(ref(db,"orders/"+orderId));
+  if(!snap.exists()) return;
+
+  const order = snap.val();
+
+  if(order.seen){
+    alert("Đơn đã được xử lý, không thể hủy!");
+    return;
+  }
+
+  await restoreStock(order.items);
+  await remove(ref(db,"orders/"+orderId));
+  alert("Đã hủy đơn và hoàn lại tồn kho!");
+  searchMyOrders();
 };
 
 saveEdit.onclick = () => {
