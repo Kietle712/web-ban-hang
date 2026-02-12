@@ -247,6 +247,12 @@ function renderProducts(){
 
 function renderOrders(snapshot){
   orderList.innerHTML="";
+
+  if(!snapshot.exists()){
+    orderList.innerHTML="<p class='text-muted'>Chưa có đơn hàng nào</p>";
+    return;
+  }
+
   snapshot.forEach(child=>{
     const order = child.val();
     const orderId = child.key;
@@ -272,15 +278,12 @@ function renderOrders(snapshot){
     };
 
     div.querySelector(".delete-order-btn").onclick = () => {
-      if(confirm("Bạn có chắc muốn xóa đơn hàng này không?")){
-        remove(ref(db,"orders/"+orderId));
-      }
+      remove(ref(db,"orders/"+orderId));
     };
 
     orderList.appendChild(div);
   });
 }
-
 function openBill(p){
   currentBillProduct=p;
   billName.textContent=p.name;
@@ -489,4 +492,5 @@ productForm.onsubmit=e=>{
 </script>
 </body>
 </html>
+
 
