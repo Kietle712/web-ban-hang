@@ -264,7 +264,11 @@ function renderOrders(snapshot){
       <strong>👤 Khách:</strong> ${order.customerName || "Không có"} <br>
       <strong>📞 SĐT:</strong> ${order.customerPhone || "Không có"} <br>
       <strong>🏠 Địa chỉ:</strong> ${order.customerAddress || "Không có"} <br>
-      <pre class="mb-1">${order.items.map(i=>`${i.name} x${i.qty}`).join("\n")}</pre>
+      <pre class="mb-1">${
+  Array.isArray(order.items)
+    ? order.items.map(i=>`${i.name} x${i.qty}`).join("\n")
+    : "Không có chi tiết sản phẩm"
+    }</pre>
       <strong>Tổng tiền:</strong> ${Number(order.total).toLocaleString()} VND<br>
       <label>
         <input type="checkbox" ${order.seen ? "checked" : ""}>
@@ -410,7 +414,11 @@ window.searchMyOrders = function(){
         box.innerHTML+=`
           <div class="border rounded p-2 mb-2">
             <strong>🕒 ${o.time}</strong><br>
-            ${o.items.map(i=>`${i.name} x${i.qty}`).join("<br>")}
+            ${
+  Array.isArray(o.items)
+    ? o.items.map(i=>`${i.name} x${i.qty}`).join("<br>")
+    : "Không có chi tiết sản phẩm"
+}
             <br><strong>Tổng tiền:</strong> ${Number(o.total).toLocaleString()} VND
             <br>
             <span class="badge ${o.seen?"bg-success":"bg-warning"}">
@@ -492,5 +500,6 @@ productForm.onsubmit=e=>{
 </script>
 </body>
 </html>
+
 
 
